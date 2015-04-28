@@ -1,9 +1,15 @@
 # transmart-horde
-This contains code for a prototype of "federation"
+This contains code for a prototype of "federation".
+
 It only considers the concept tree so far. Data is going to be hard.
 
-Configuration to add in Config.groovy
+*No tests are yet available*
 
+## Configuration
+
+Add as object to Config.groovy
+
+```groovy
 transmart { horde {
 
 	uuid = "7d6ff94b-363f-9c3a-8a09-0ded5728b436"
@@ -12,10 +18,11 @@ transmart { horde {
 		"http://example.com/transmart"
 	]
 }}
+```
 
-Add to Spring Security chain :
+Add to Spring Security chain in Config.groovy :
 
+```groovy
 '/horde/**'                   : ["permitAll"],
 '/hordeConcepts/**'           : ["permitAll"],
-
-No tests are yet available for the Services
+```
