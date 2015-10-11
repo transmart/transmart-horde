@@ -1,9 +1,9 @@
 package transmart.horde
 
+import grails.converters.JSON
 import grails.transaction.Transactional
 import org.apache.log4j.Logger
 import org.springframework.web.context.request.RequestContextHolder
-import org.transmart.searchapp.AuthUser
 
 @Transactional
 class HordeConceptsResourceService {
@@ -12,15 +12,15 @@ class HordeConceptsResourceService {
     def grailsApplication
     def i2b2HelperService
     def grailsLinkGenerator
-    def springSecurityService
     def conceptsResourceService
     def log = Logger.getLogger(HordeHolder.class);
 
     def getAllCategories() {
 
+        def (from, data) = HordeSecurity.gatherInput()
+
         // Quick check to make sure we are not looping
         // And yes we know services are supposed to be stateless
-        def from = RequestContextHolder?.currentRequestAttributes()?.params['from']
         if (from?.tokenize('|')?.findAll { it == HordeHolder.config?.uuid }?.size())
             return [:]
 
@@ -31,36 +31,6 @@ class HordeConceptsResourceService {
         filterCategories(localTree + remoteTrees)
     }
 
-    def getChildren(parent) {
-
-        // Quick check to make sure we are not looping
-        // And yes we know services are supposed to be stateless
-        def from = RequestContextHolder?.currentRequestAttributes()?.params['from']
-        if (from?.tokenize('|')?.findAll { it == HordeHolder.config?.uuid }?.size())
-            return [:]
-
-        System.out.println("Stored value for $parent: ${HordeHolder.retrieve(parent)}")
-
-        def remoteTrees = [].jsonElement()
-        def link = grailsLinkGenerator.link(controller: 'hordeConcepts', action: 'getChildren', contextPath: '')
-
-        from = "${HordeHolder.config?.uuid}${from ? "|${from}" : ''}"
-        HordeHolder.retrieve(parent)?.tokenize('&')?.each { n ->
-            if (n?.tokenize('|')?.size() > 1) {
-                log.debug("Querying $parent on node: ${HordeHolder.endpoints[n?.tokenize('|')[1]]}$link")
-                def url = "${HordeHolder.endpoints[n?.tokenize('|')[1]]}$link?from={f}&concept_key={k}"
-                def var = [f: from, k: parent]
-                remoteTrees += restBuilder.get(url, var)?.json ?: [:].jsonElement()
-            }
-            else {
-                log.debug("Querying $parent locally")
-                remoteTrees += conceptsResourceService.getByKey(parent).children.jsonElement()
-            }
-        }
-
-        filterCategories(remoteTrees)
-    }
-
     def getAllRemoteCategories() {
 
         def remoteTrees = [].jsonElement()
@@ -68,11 +38,51 @@ class HordeConceptsResourceService {
         def link = grailsLinkGenerator.link(controller: 'hordeConcepts', action: 'getCategories', contextPath: '')
 
         from = "${HordeHolder.config?.uuid}${from ? "|${from}" : ''}"
-        HordeHolder.config?.endpoints?.each { e ->
-            remoteTrees += restBuilder.get("$e$link?from={f}", [f: from])?.json ?: [:].jsonElement()
+        HordeHolder.endpoints?.findAll { u, e ->
+            e && e?.url && e?.url != "null"
+        }?.each { u, e ->
+            def url = "${e.url}$link"
+            def var = [:]
+            remoteTrees += restBuilder.post(url) {
+                body([from: from, data: HordeSecurity.bolt(u, var)] as JSON)
+            }?.json
         }
 
         remoteTrees
+    }
+
+
+    def getChildren() {
+
+        def (from, data) = HordeSecurity.gatherInput()
+
+        // Quick check to make sure we are not looping
+        // And yes we know services are supposed to be stateless
+        if (from?.tokenize('|')?.findAll { it == HordeHolder.config?.uuid }?.size())
+            return [:]
+
+        System.out.println("Stored value for ${data?.concept_key}: ${HordeHolder.retrieve(data?.concept_key)}")
+
+        def remoteTrees = [].jsonElement()
+        def link = grailsLinkGenerator.link(controller: 'hordeConcepts', action: 'getChildren', contextPath: '')
+
+        from = "${HordeHolder.config?.uuid}${from ? "|${from}" : ''}"
+        HordeHolder.retrieve(data?.concept_key)?.tokenize('&')?.each { n ->
+            if (n?.tokenize('|')?.size() > 1) {
+                log.debug("Querying ${data?.concept_key} on node: ${HordeHolder.endpoints[n?.tokenize('|')[1]].url}$link")
+                def end = n?.tokenize('|')[1]
+                def url = "${HordeHolder.endpoints[end].url}$link"
+                def var = [concept_key: data?.concept_key]
+                remoteTrees += restBuilder.post(url) {
+                    body([from: from, data: HordeSecurity.bolt(end, var)] as JSON)
+                }?.json ?: [:].jsonElement()
+            } else {
+                log.debug("Querying ${data?.concept_key} locally")
+                remoteTrees += conceptsResourceService.getByKey(data?.concept_key).children.jsonElement()
+            }
+        }
+
+        filterCategories(remoteTrees)
     }
 
     def filterCategories(def categories) {
@@ -104,25 +114,30 @@ class HordeConceptsResourceService {
 
     def getInitialAccess() {
 
+        def (from, data) = HordeSecurity.gatherInput()
+
         // Quick check to make sure we are not looping
         // And yes we know services are supposed to be stateless
-        def from = RequestContextHolder?.currentRequestAttributes()?.params['from']
         if (from?.tokenize('|')?.findAll { it == HordeHolder.config?.uuid }?.size())
             return [:]
 
-        def user = RequestContextHolder?.currentRequestAttributes()?.params['user'] ?: grailsApplication.config.com?.recomdata?.guestUserName
-        if (springSecurityService.isLoggedIn())
-            user = springSecurityService?.getPrincipal()?.username
+        def user = HordeSecurity.fetchUser data
 
-        if (user && (user = AuthUser.findByUsername(user))) {
+        from = "${HordeHolder.config?.uuid}${from ? "|${from}" : ''}"
+        if (user) {
 
             def accesses = i2b2HelperService.getAccess(i2b2HelperService.getRootPathsWithTokens(), user).jsonElement()
             def link = grailsLinkGenerator.link(controller: 'hordeConcepts', action: 'getInitialAccess', contextPath: '')
 
-            HordeHolder.config?.endpoints?.each { e ->
-                System.out.println("Endpoint ($e) -> $user")
-                System.out.println("Endpoint ($e) -> ${restBuilder.get("$e$link?user={u}", [u: user.username])?.json}")
-                accesses += restBuilder.get("$e$link?user={u}", [u: user.username])?.json ?: [:].jsonElement()
+            HordeHolder.endpoints?.findAll { u, e ->
+                e && e?.url && e?.url != "null"
+            }?.each { u, e ->
+                System.out.println("Endpoint ($e) -> ${user.username}")
+                def url = "${e.url}$link"
+                def var = [user: user.username]
+                accesses += restBuilder.post(url) {
+                    body([from: from, data: HordeSecurity.bolt(u, var)] as JSON)
+                }?.json ?: [:].jsonElement()
             }
 
             System.out.println(accesses.jsonElement())
@@ -133,29 +148,42 @@ class HordeConceptsResourceService {
         [:].jsonElement()
     }
 
-    def getChildConceptPatientCounts(concept) {
+    def getChildConceptPatientCounts() {
 
-        def user = RequestContextHolder?.currentRequestAttributes()?.params['user'] ?: grailsApplication.config.com?.recomdata?.guestUserName
-        if (springSecurityService.isLoggedIn())
-            user = springSecurityService?.getPrincipal()?.username
+        def (from, data) = HordeSecurity.gatherInput()
 
-        if (concept && user && (user = AuthUser.findByUsername(user))) {
+        // Quick check to make sure we are not looping
+        // And yes we know services are supposed to be stateless
+        if (from?.tokenize('|')?.findAll { it == HordeHolder.config?.uuid }?.size())
+            return [:]
 
-            def results = [:]
+        def user = HordeSecurity.fetchUser data
+
+        System.out.println("USER : $user")
+        def results = [:]
+        if (data?.concept_key && user) {
+
             def link = grailsLinkGenerator.link(controller: 'hordeConcepts', action: 'getChildConceptPatientCounts', contextPath: '')
 
-            results["counts"] = i2b2HelperService.getChildrenWithPatientCountsForConcept(concept)
-            results["accesslevels"] = i2b2HelperService.getChildrenWithAccessForUserNew(concept, user)
-
-            HordeHolder.config?.endpoints?.each { e ->
-                (restBuilder.get("$e$link?user={u}&concept_key={k}", [u: user.username, k: concept])?.json ?: [:].jsonElement()).each { k, v ->
-                    results[k] += v
+            from = "${HordeHolder.config?.uuid}${from ? "|${from}" : ''}"
+            HordeHolder.retrieve(data?.concept_key)?.tokenize('&')?.each { n ->
+                if (n?.tokenize('|')?.size() > 1) {
+                    log.debug("Querying ${data?.concept_key} on node: ${HordeHolder.endpoints[n?.tokenize('|')[1]].url}$link")
+                    def end = n?.tokenize('|')[1]
+                    def url = "${HordeHolder.endpoints[end].url}$link"
+                    def var = [concept_key: data?.concept_key, user: user.username]
+                    results << restBuilder.post(url) {
+                        body([from: from, data: HordeSecurity.bolt(end, var)] as JSON)
+                    }?.json ?: [:].jsonElement()
+                } else {
+                    log.debug("Querying ${data?.concept_key} locally")
+                    results["counts"] = i2b2HelperService.getChildrenWithPatientCountsForConcept(data?.concept_key)
+                    results["accesslevels"] = i2b2HelperService.getChildrenWithAccessForUserNew(data?.concept_key, user)
                 }
             }
-
-            return results
         }
 
-        [:].jsonElement()
+        System.out.println("ACCESS : $results")
+        return results
     }
 }

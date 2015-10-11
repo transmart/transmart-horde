@@ -11,7 +11,7 @@ class HordeConceptsController {
     }
 
     def getChildren() {
-        render hordeConceptsResourceService.getChildren(params.get('concept_key')) as JSON
+        render hordeConceptsResourceService.children as JSON
     }
 
     def getInitialAccess() {
@@ -19,6 +19,6 @@ class HordeConceptsController {
     }
 
     def getChildConceptPatientCounts() {
-        render hordeConceptsResourceService.getChildConceptPatientCounts(params.get('concept_key')) as JSON
+        render hordeConceptsResourceService.childConceptPatientCounts as JSON
     }
 }

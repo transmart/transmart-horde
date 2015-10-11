@@ -51,7 +51,6 @@ class TransmartHordeGrailsPlugin {
             grailsApplication = ref('grailsApplication')
             i2b2HelperService = ref('i2b2HelperService')
             grailsLinkGenerator = ref('grailsLinkGenerator')
-            springSecurityService = ref('springSecurityService')
             conceptsResourceService = ref('conceptsResourceService')
         }
 
@@ -59,6 +58,10 @@ class TransmartHordeGrailsPlugin {
         // It is cleaner than having the code here
         hordeHolder(transmart.horde.HordeHolder) { beanDefinition ->
             beanDefinition.constructorArgs = [ref('grailsApplication'), ref('restBuilder'), ref('grailsLinkGenerator')]
+        }
+        hordeSecurity(transmart.horde.HordeSecurity) { beanDefinition ->
+            beanDefinition.dependsOn = ['hordeHolder']
+            beanDefinition.constructorArgs = [ref('grailsApplication'), ref('springSecurityService')]
         }
     }
 

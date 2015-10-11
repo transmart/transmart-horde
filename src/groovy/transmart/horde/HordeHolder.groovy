@@ -1,5 +1,6 @@
 package transmart.horde
 
+import grails.converters.JSON
 import groovy.transform.Synchronized
 import org.apache.log4j.Logger
 
@@ -14,24 +15,33 @@ class HordeHolder {
 
     HordeHolder(def grailsApplication, def restBuilder, def grailsLinkGenerator) {
 
+        log.debug("Instantiating HordeHolder ...")
         this.restBuilder = restBuilder
         this.grailsApplication = grailsApplication
         this.grailsLinkGenerator = grailsLinkGenerator
 
-        identifyEndpoints()
     }
 
     @Synchronized
-    static def identifyEndpoints() {
+    static synchronized def identifyEndpoints() {
 
-        log.debug("Horde endpoints UUID detection")
+        log.debug("Horde endpoints UUID detection ...")
         def link = grailsLinkGenerator.link(controller: 'horde', action: 'identifier', contextPath: '')
         config?.endpoints?.each { e ->
-            log.debug("Indentifying '$e' ...")
-            restBuilder.get("$e$link")?.json?.uuid?.with { u ->
-                endpoints[u] = e
+            log.debug("Indentifying '$e'")
+            restBuilder.post("$e$link") {
+                body([uuid: config?.uuid ?: '', pub: HordeSecurity.asymmetricKeys.public?.encoded?.encodeAsBase64()] as JSON)
+            }?.json?.with { j ->
+                registerEndpoint(j.uuid, j.pub, e)
             }
         }
+    }
+
+    static def registerEndpoint(uuid, pub, url = null) {
+        if (!uuid || !pub)
+            return
+        log.debug("Adding '$uuid' : ${"$pub".take(20)} !")
+        endpoints["$uuid"] = [url : url, pub: HordeSecurity.convertPublicKey(pub)]
     }
 
     static def getConfig() {
@@ -39,7 +49,7 @@ class HordeHolder {
     }
 
     @Synchronized
-    static def cache(k, v) {
+    static synchronized def cache(k, v) {
         cache[k] = v
     }
 
