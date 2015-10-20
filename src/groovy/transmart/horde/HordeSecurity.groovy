@@ -87,15 +87,12 @@ class HordeSecurity {
     }
 
     static def gatherOutput(route, data) {
-        System.out.println("REPLY TO ? : ${route}")
-        System.out.println("PRESERVE ? : ${!!route}")
+        System.out.println("REPLYING TO : ${route ?: 'Frontend'}")
         if (route == null)
             System.out.println("OUTPUT ? : $data")
         else
             System.out.println("OUTPUT ? : ${bolt(route, data)}")
-        System.out.println("")
-        System.out.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        System.out.println("")
+        System.out.println("\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n\n")
         return route == null ? data : bolt(route, data)
     }
 
