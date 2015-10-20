@@ -30,9 +30,9 @@ class HordeHolder {
         config?.endpoints?.each { e ->
             log.debug("Indentifying '$e'")
             restBuilder.post("$e$link") {
-                body([uuid: config?.uuid ?: '', pub: HordeSecurity.asymmetricKeys.public?.encoded?.encodeAsBase64()] as JSON)
+                body([from: config?.uuid ?: '', pub: HordeSecurity.asymmetricKeys.public?.encoded?.encodeAsBase64()] as JSON)
             }?.json?.with { j ->
-                registerEndpoint(j.uuid, j.pub, e)
+                registerEndpoint(j.from, j.pub, e)
             }
         }
     }

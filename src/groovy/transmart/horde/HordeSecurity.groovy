@@ -83,7 +83,20 @@ class HordeSecurity {
         }
 
         System.out.println("DATA : $data")
-        [source?.uuid, source?.pub ?: data]
+        [source?.from, source?.pub ?: data]
+    }
+
+    static def gatherOutput(route, data) {
+        System.out.println("REPLY TO ? : ${route}")
+        System.out.println("PRESERVE ? : ${!!route}")
+        if (route == null)
+            System.out.println("OUTPUT ? : $data")
+        else
+            System.out.println("OUTPUT ? : ${bolt(route, data)}")
+        System.out.println("")
+        System.out.println("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        System.out.println("")
+        return route == null ? data : bolt(route, data)
     }
 
     static def fetchUser(data) {
@@ -99,7 +112,7 @@ class HordeSecurity {
         user
     }
 
-    static def bolt(uuid, Map params) {
+    static def bolt(uuid, params) {
 
         def result = [:]
         if (!uuid || !params)

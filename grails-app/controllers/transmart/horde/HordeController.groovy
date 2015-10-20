@@ -10,7 +10,7 @@ class HordeController {
 
         def (from, data) = HordeSecurity.gatherInput()
         HordeHolder.registerEndpoint(from, data)
-        render [:] << [ uuid: HordeHolder.config?.uuid ?: '', pub: HordeSecurity.asymmetricKeys.public?.encoded?.encodeAsBase64()] as JSON
+        render [:] << [ from: HordeHolder.config?.uuid ?: '', pub: HordeSecurity.asymmetricKeys.public?.encoded?.encodeAsBase64()] as JSON
     }
 
     def forceReload() {
