@@ -5,6 +5,10 @@ It only considers the concept tree so far. Data is going to be hard.
 
 *No tests are yet available*
 
+## Disclaimer
+
+Do not use as such on internet-exposed machine !
+
 ## Configuration
 
 Add as object to Config.groovy
